@@ -64,10 +64,13 @@ struct SDL_Vout {
 
     SDL_Class       *opaque_class;
     SDL_Vout_Opaque *opaque;
+    //创建图层
     SDL_VoutOverlay *(*create_overlay)(int width, int height, int frame_format, SDL_Vout *vout);
+    //释放
     void (*free_l)(SDL_Vout *vout);
+    //展示图层
     int (*display_overlay)(SDL_Vout *vout, SDL_VoutOverlay *overlay);
-
+    //图层格式
     Uint32 overlay_format;
 };
 

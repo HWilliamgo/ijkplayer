@@ -97,6 +97,7 @@ inline static int msg_queue_put_private(MessageQueue *q, AVMessage *msg)
         q->last_msg->next = msg1;
     q->last_msg = msg1;
     q->nb_messages++;
+    //唤醒正在等待消息线程msg_thread
     SDL_CondSignal(q->cond);
     return 0;
 }
@@ -104,7 +105,7 @@ inline static int msg_queue_put_private(MessageQueue *q, AVMessage *msg)
 inline static int msg_queue_put(MessageQueue *q, AVMessage *msg)
 {
     int ret;
-
+    //线程安全保护
     SDL_LockMutex(q->mutex);
     ret = msg_queue_put_private(q, msg);
     SDL_UnlockMutex(q->mutex);
@@ -137,10 +138,12 @@ inline static void msg_queue_put_simple2(MessageQueue *q, int what, int arg1)
 inline static void msg_queue_put_simple3(MessageQueue *q, int what, int arg1, int arg2)
 {
     AVMessage msg;
+    //初始化一条空的msg
     msg_init_msg(&msg);
     msg.what = what;
     msg.arg1 = arg1;
     msg.arg2 = arg2;
+    //消息入队，这个队列是ffplay->msg_queue。
     msg_queue_put(q, &msg);
 }
 
@@ -265,6 +268,7 @@ inline static int msg_queue_get(MessageQueue *q, AVMessage *msg, int block)
             ret = 0;
             break;
         } else {
+            //如果消息队列为空，则阻塞当前线程并等待被唤醒。
             SDL_CondWait(q->cond, q->mutex);
         }
     }

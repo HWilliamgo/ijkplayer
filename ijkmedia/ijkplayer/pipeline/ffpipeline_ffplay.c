@@ -47,7 +47,7 @@ static SDL_Aout *func_open_audio_output(IJKFF_Pipeline *pipeline, FFPlayer *ffp)
 {
     return NULL;
 }
-
+//这个方法是不会被用到的，真正调用的方法是：ffpipeline_create_from_android()。在ijkmp_android_create中创建
 IJKFF_Pipeline *ffpipeline_create_from_ffplay(FFPlayer *ffp)
 {
     IJKFF_Pipeline *pipeline = ffpipeline_alloc(&g_pipeline_class, sizeof(IJKFF_Pipeline_Opaque));

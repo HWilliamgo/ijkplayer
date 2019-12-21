@@ -116,14 +116,16 @@ void ijkmp_change_state_l(IjkMediaPlayer *mp, int new_state)
 
 IjkMediaPlayer *ijkmp_create(int (*msg_loop)(void*))
 {
+    //分配内存
     IjkMediaPlayer *mp = (IjkMediaPlayer *) mallocz(sizeof(IjkMediaPlayer));
     if (!mp)
         goto fail;
-
+    //创建IjkMediaPlayer内部的FFPlayer
     mp->ffplayer = ffp_create();
     if (!mp->ffplayer)
         goto fail;
-
+    //注意：将msg_loop函数赋值给IjkMediaPlayer的函数引用，在创建的时候赋值，在另一处被调用。
+    //在哪里被调用呢？在prepareAsync()里面，后面分析prepare方法的时候就会再见到消息循环函数了。
     mp->msg_loop = msg_loop;
 
     ijkmp_inc_ref(mp);
@@ -356,10 +358,11 @@ static int ijkmp_set_data_source_l(IjkMediaPlayer *mp, const char *url)
     MPST_RET_IF_EQ(mp->mp_state, MP_STATE_END);
 
     freep((void**)&mp->data_source);
+    //设置Url
     mp->data_source = strdup(url);
     if (!mp->data_source)
         return EIJK_OUT_OF_MEMORY;
-
+    //改变播放器状态为MP_STATE_INITIALIZED
     ijkmp_change_state_l(mp, MP_STATE_INITIALIZED);
     return 0;
 }
@@ -397,21 +400,23 @@ static int ijkmp_prepare_async_l(IjkMediaPlayer *mp)
     // MPST_RET_IF_EQ(mp->mp_state, MP_STATE_STOPPED);
     MPST_RET_IF_EQ(mp->mp_state, MP_STATE_ERROR);
     MPST_RET_IF_EQ(mp->mp_state, MP_STATE_END);
-
+    //声明url不为空
     assert(mp->data_source);
-
+    //改变播放器状态到MP_STATE_ASYNC_PREPARING
     ijkmp_change_state_l(mp, MP_STATE_ASYNC_PREPARING);
-
+    //消息队列开始
     msg_queue_start(&mp->ffplayer->msg_queue);
 
     // released in msg_loop
     ijkmp_inc_ref(mp);
+    //创建并启动消息线程，开启循环来读取消息队列的消息。
     mp->msg_thread = SDL_CreateThreadEx(&mp->_msg_thread, ijkmp_msg_loop, mp, "ff_msg_loop");
     // msg_thread is detached inside msg_loop
     // TODO: 9 release weak_thiz if pthread_create() failed;
-
+    //逻辑跳转到ff_ffplay.c
     int retval = ffp_prepare_async_l(mp->ffplayer, mp->data_source);
     if (retval < 0) {
+        //出错，则抛出MP_STATE_ERROR
         ijkmp_change_state_l(mp, MP_STATE_ERROR);
         return retval;
     }
@@ -691,6 +696,7 @@ int ijkmp_get_msg(IjkMediaPlayer *mp, AVMessage *msg, int block)
     assert(mp);
     while (1) {
         int continue_wait_next_msg = 0;
+        //取消息，如果没有消息则阻塞。
         int retval = msg_queue_get(&mp->ffplayer->msg_queue, msg, block);
         if (retval <= 0)
             return retval;

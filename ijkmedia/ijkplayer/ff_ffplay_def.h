@@ -210,8 +210,8 @@ typedef struct Clock {
 
 /* Common struct for handling all types of decoded data and allocated render buffers. */
 typedef struct Frame {
-    AVFrame *frame;
-    AVSubtitle sub;
+    AVFrame *frame;//ffmpeg定义的数据结构，里面存着buffer，存着真实的yuv图像数据
+    AVSubtitle sub;//字幕数据
     int serial;
     double pts;           /* presentation timestamp for the frame */
     double duration;      /* estimated duration of the frame */
@@ -219,7 +219,7 @@ typedef struct Frame {
 #ifdef FFP_MERGE
     SDL_Texture *bmp;
 #else
-    SDL_VoutOverlay *bmp;
+    SDL_VoutOverlay *bmp;//vout设备
 #endif
     int allocated;
     int width;
@@ -230,16 +230,16 @@ typedef struct Frame {
 } Frame;
 
 typedef struct FrameQueue {
-    Frame queue[FRAME_QUEUE_SIZE];
-    int rindex;
-    int windex;
+    Frame queue[FRAME_QUEUE_SIZE];//数组
+    int rindex;//read index。下一个读取的下标
+    int windex;//write index。下一个写入的下标
     int size;
     int max_size;
     int keep_last;
     int rindex_shown;
     SDL_mutex *mutex;
     SDL_cond *cond;
-    PacketQueue *pktq;
+    PacketQueue *pktq;//引用的未解码的包队列
 } FrameQueue;
 
 enum {
@@ -273,12 +273,12 @@ typedef struct Decoder {
 } Decoder;
 
 typedef struct VideoState {
-    SDL_Thread *read_tid;
+    SDL_Thread *read_tid;//读线程
     SDL_Thread _read_tid;
-    AVInputFormat *iformat;
-    int abort_request;
-    int force_refresh;
-    int paused;
+    AVInputFormat *iformat;//输入格式
+    int abort_request;//停止请求
+    int force_refresh;//强制刷新
+    int paused;//暂停
     int last_paused;
     int queue_attachments_req;
     int seek_req;
@@ -289,21 +289,21 @@ typedef struct VideoState {
     int read_pause_return;
 #endif
     AVFormatContext *ic;
-    int realtime;
+    int realtime;//是否是直播
 
-    Clock audclk;
-    Clock vidclk;
-    Clock extclk;
+    Clock audclk;//音频时钟
+    Clock vidclk;//视频时钟
+    Clock extclk;//外部时钟
 
-    FrameQueue pictq;
-    FrameQueue subpq;
-    FrameQueue sampq;
+    FrameQueue pictq;//图片帧队列：解码后的视频数据
+    FrameQueue subpq;//字幕帧队列：解码后的字幕数据
+    FrameQueue sampq;//音频帧队列：解码后的音频数据
 
-    Decoder auddec;
-    Decoder viddec;
-    Decoder subdec;
+    Decoder auddec;//音频解码器
+    Decoder viddec;//视频解码器
+    Decoder subdec;//字幕解码器
 
-    int audio_stream;
+    int audio_stream;//音频流
 
     int av_sync_type;
     void *handle;
@@ -314,7 +314,7 @@ typedef struct VideoState {
     double audio_diff_threshold;
     int audio_diff_avg_count;
     AVStream *audio_st;
-    PacketQueue audioq;
+    PacketQueue audioq;//音频包数据：未解码的音频数据，从demuxers输出
     int audio_hw_buf_size;
     uint8_t *audio_buf;
     uint8_t *audio_buf1;
@@ -356,14 +356,14 @@ typedef struct VideoState {
 
     int subtitle_stream;
     AVStream *subtitle_st;
-    PacketQueue subtitleq;
+    PacketQueue subtitleq;//未解码的字幕数据：从demuxser输出
 
     double frame_timer;
     double frame_last_returned_time;
     double frame_last_filter_delay;
     int video_stream;
     AVStream *video_st;
-    PacketQueue videoq;
+    PacketQueue videoq;//未解码的视频数据：从demuxsers输出
     double max_frame_duration;      // maximum duration of a frame - above this, we consider the jump a timestamp discontinuity
     struct SwsContext *img_convert_ctx;
 #ifdef FFP_SUB
@@ -372,7 +372,7 @@ typedef struct VideoState {
     int eof;
 
     char *filename;
-    int width, height, xleft, ytop;
+    int width, height, xleft, ytop;//视频的：宽、高、左上角x坐标，左上角y坐标。和ffmpeg里面的是对应的。
     int step;
 
 #if CONFIG_AVFILTER

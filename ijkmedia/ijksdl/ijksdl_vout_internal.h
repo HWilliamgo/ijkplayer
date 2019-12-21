@@ -31,16 +31,17 @@
 
 inline static SDL_Vout *SDL_Vout_CreateInternal(size_t opaque_size)
 {
+    //分配Vout内存
     SDL_Vout *vout = (SDL_Vout*) calloc(1, sizeof(SDL_Vout));
     if (!vout)
         return NULL;
-
+    //分配Opaue内存
     vout->opaque = calloc(1, opaque_size);
     if (!vout->opaque) {
         free(vout);
         return NULL;
     }
-
+    //创建互斥锁
     vout->mutex = SDL_CreateMutex();
     if (vout->mutex == NULL) {
         free(vout->opaque);

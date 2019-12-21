@@ -71,8 +71,10 @@ static IJKFF_Pipenode *func_open_video_decoder(IJKFF_Pipeline *pipeline, FFPlaye
     IJKFF_Pipenode        *node = NULL;
 
     if (ffp->mediacodec_all_videos || ffp->mediacodec_avc || ffp->mediacodec_hevc || ffp->mediacodec_mpeg2)
+        //从硬解中创建解码器
         node = ffpipenode_create_video_decoder_from_android_mediacodec(ffp, pipeline, opaque->weak_vout);
     if (!node) {
+        //从ffplay中创建解码器，即ffmpeg的解码器
         node = ffpipenode_create_video_decoder_from_ffplay(ffp);
     }
 
@@ -134,10 +136,11 @@ inline static bool check_ffpipeline(IJKFF_Pipeline* pipeline, const char *func_n
 IJKFF_Pipeline *ffpipeline_create_from_android(FFPlayer *ffp)
 {
     ALOGD("ffpipeline_create_from_android()\n");
+    //分配内存
     IJKFF_Pipeline *pipeline = ffpipeline_alloc(&g_pipeline_class, sizeof(IJKFF_Pipeline_Opaque));
     if (!pipeline)
         return pipeline;
-
+    //初始化opaque
     IJKFF_Pipeline_Opaque *opaque = pipeline->opaque;
     opaque->ffp                   = ffp;
     opaque->surface_mutex         = SDL_CreateMutex();
@@ -147,7 +150,7 @@ IJKFF_Pipeline *ffpipeline_create_from_android(FFPlayer *ffp)
         ALOGE("ffpipeline-android:create SDL_CreateMutex failed\n");
         goto fail;
     }
-
+    //初始化pipeline中的每个函数
     pipeline->func_destroy              = func_destroy;
     pipeline->func_open_video_decoder   = func_open_video_decoder;
     pipeline->func_open_audio_output    = func_open_audio_output;

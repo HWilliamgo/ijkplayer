@@ -43,6 +43,7 @@ static int func_run_sync(IJKFF_Pipenode *node)
 
 IJKFF_Pipenode *ffpipenode_create_video_decoder_from_ffplay(FFPlayer *ffp)
 {
+    //分配IJKFF_Pipenode的内存
     IJKFF_Pipenode *node = ffpipenode_alloc(sizeof(IJKFF_Pipenode_Opaque));
     if (!node)
         return node;

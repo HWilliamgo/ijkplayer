@@ -97,8 +97,10 @@ static SDL_VoutOverlay *func_create_overlay_l(int width, int height, int frame_f
 {
     switch (frame_format) {
     case IJK_AV_PIX_FMT__ANDROID_MEDIACODEC:
+        //如果帧的格式是IJK_AV_PIX_FMT__ANDROID_MEDIACODEC，就用硬解创建
         return SDL_VoutAMediaCodec_CreateOverlay(width, height, vout);
     default:
+        //否则用软解创建
         return SDL_VoutFFmpeg_CreateOverlay(width, height, frame_format, vout);
     }
 }
@@ -207,6 +209,7 @@ static SDL_Class g_nativewindow_class = {
 
 SDL_Vout *SDL_VoutAndroid_CreateForANativeWindow()
 {
+    //创建SDL_Vout
     SDL_Vout *vout = SDL_Vout_CreateInternal(sizeof(SDL_Vout_Opaque));
     if (!vout)
         return NULL;
@@ -217,11 +220,11 @@ SDL_Vout *SDL_VoutAndroid_CreateForANativeWindow()
         goto fail;
     if (ISDL_Array__init(&opaque->overlay_pool, 32))
         goto fail;
-
+    //创建egl
     opaque->egl = IJK_EGL_create();
     if (!opaque->egl)
         goto fail;
-
+    //为vout的函数赋值
     vout->opaque_class    = &g_nativewindow_class;
     vout->create_overlay  = func_create_overlay;
     vout->free_l          = func_free_l;

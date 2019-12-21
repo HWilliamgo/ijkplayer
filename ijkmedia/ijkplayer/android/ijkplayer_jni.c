@@ -750,6 +750,7 @@ static void
 IjkMediaPlayer_native_setup(JNIEnv *env, jobject thiz, jobject weak_this)
 {
     MPTRACE("%s\n", __func__);
+    //创建IjkMediaPlayer，并传入message_loop()方法作为参数
     IjkMediaPlayer *mp = ijkmp_android_create(message_loop);
     JNI_CHECK_GOTO(mp, env, "java/lang/OutOfMemoryError", "mpjni: native_setup: ijkmp_create() failed", LABEL_RETURN);
 
@@ -900,7 +901,7 @@ static void message_loop_n(JNIEnv *env, IjkMediaPlayer *mp)
 
     while (1) {
         AVMessage msg;
-
+        //取消息队列的消息，如果没有消息就阻塞，直到有消息被发到消息队列。
         int retval = ijkmp_get_msg(mp, &msg, 1);
         if (retval < 0)
             break;
@@ -911,6 +912,7 @@ static void message_loop_n(JNIEnv *env, IjkMediaPlayer *mp)
         switch (msg.what) {
         case FFP_MSG_FLUSH:
             MPTRACE("FFP_MSG_FLUSH:\n");
+            //调用post_event，把事件发送到java层。
             post_event(env, weak_thiz, MEDIA_NOP, 0, 0);
             break;
         case FFP_MSG_ERROR:
@@ -1042,7 +1044,7 @@ static int message_loop(void *arg)
 
     IjkMediaPlayer *mp = (IjkMediaPlayer*) arg;
     JNI_CHECK_GOTO(mp, env, NULL, "mpjni: native_message_loop: null mp", LABEL_RETURN);
-
+    //开启类似Android的looper的消息机制。
     message_loop_n(env, mp);
 
 LABEL_RETURN:
@@ -1196,8 +1198,10 @@ JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved)
 
     // FindClass returns LocalReference
     IJK_FIND_JAVA_CLASS(env, g_clazz.clazz, JNI_CLASS_IJKPLAYER);
+    //标准的饿RegisterNatives方法，g_methods方法返回要注册的jni方法数组
     (*env)->RegisterNatives(env, g_clazz.clazz, g_methods, NELEM(g_methods) );
 
+    //播放器全局初始化，注册ffmpeg的解码器，解封装器，加载外部库如openssl等
     ijkmp_global_init();
     ijkmp_global_set_inject_callback(inject_callback);
 
