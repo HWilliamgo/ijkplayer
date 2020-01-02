@@ -30,6 +30,8 @@
         "vector": "c",
         "cerrno": "c",
         "__functional_03": "c",
-        "functional": "c"
+        "functional": "c",
+        "ffpipenode_android_mediacodec_vdec.h": "c",
+        "queue": "cpp"
     }
 }
