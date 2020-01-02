@@ -695,7 +695,7 @@ static int frame_queue_init(FrameQueue *f, PacketQueue *pktq, int max_size, int 
     f->pktq = pktq;
     f->max_size = FFMIN(max_size, FRAME_QUEUE_SIZE);
     f->keep_last = !!keep_last;
-    //为帧队列中每一帧都分配一个内存
+    //为帧队列中每一帧都分配一个内存并保存在数组中。数组长度默认是16
     for (i = 0; i < f->max_size; i++)
         if (!(f->queue[i].frame = av_frame_alloc()))
             return AVERROR(ENOMEM);
@@ -769,8 +769,9 @@ static Frame *frame_queue_peek_readable(FrameQueue *f)
     return &f->queue[(f->rindex + f->rindex_shown) % f->max_size];
 }
 
-static void frame_queue_push(FrameQueue *f)
+static void  frame_queue_push(FrameQueue *f)
 {
+    //当使用数组作为队列的时候，只需要移动数组中的下标到有效下标，就表示入队了，并不需要外部再传一个参数进来。
     //如果到了尾下标，则windex回到起点。这是用数组作为循环队列的必要操作。
     if (++f->windex == f->max_size)
         f->windex = 0;
@@ -1527,7 +1528,7 @@ static void alloc_picture(FFPlayer *ffp, int frame_format)
     SDL_CondSignal(is->pictq.cond);
     SDL_UnlockMutex(is->pictq.mutex);
 }
-
+//将src_frame入队到picq中，让渲染线程渲染。
 static int queue_picture(FFPlayer *ffp, AVFrame *src_frame, double pts, double duration, int64_t pos, int serial)
 {
     VideoState *is = ffp->is;
@@ -1539,7 +1540,7 @@ static int queue_picture(FFPlayer *ffp, AVFrame *src_frame, double pts, double d
 
     int64_t deviation2 = 0;
     int64_t deviation3 = 0;
-
+    //处理精确seek
     if (ffp->enable_accurate_seek && is->video_accurate_seek_req && !is->seek_req) {
         if (!isnan(pts)) {
             video_seek_pos = is->seek_pos;
@@ -1663,7 +1664,7 @@ static int queue_picture(FFPlayer *ffp, AVFrame *src_frame, double pts, double d
     /* if the frame is not skipped, then display it */
     if (vp->bmp) {
         /* get a pointer on the bitmap */
-        SDL_VoutLockYUVOverlay(vp->bmp);
+        SDL_VoutLockYUVOverlay(vp->bmp);//加锁
 
 #ifdef FFP_MERGE
 #if CONFIG_AVFILTER
@@ -1675,12 +1676,13 @@ static int queue_picture(FFPlayer *ffp, AVFrame *src_frame, double pts, double d
 #endif
 #endif
         // FIXME: set swscale options
+        //将src_frame中的帧数据填充到vp->bmp中，这个vp->bmp其实指的是bitmap？
         if (SDL_VoutFillFrameYUVOverlay(vp->bmp, src_frame) < 0) {
             av_log(NULL, AV_LOG_FATAL, "Cannot initialize the conversion context\n");
             exit(1);
         }
         /* update the bitmap content */
-        SDL_VoutUnlockYUVOverlay(vp->bmp);
+        SDL_VoutUnlockYUVOverlay(vp->bmp);//解锁
 
         vp->pts = pts;
         vp->duration = duration;
@@ -1710,6 +1712,7 @@ static int get_video_frame(FFPlayer *ffp, AVFrame *frame)
     int got_picture;
 
     ffp_video_statistic_l(ffp);
+    //解码，并将视频帧数据填充到frame中，可能阻塞
     if ((got_picture = decoder_decode_frame(ffp, &is->viddec, frame, NULL)) < 0)
         return -1;
 
@@ -2198,7 +2201,7 @@ static int ffplay_video_thread(void *arg)
 {
     FFPlayer *ffp = arg;
     VideoState *is = ffp->is;
-    AVFrame *frame = av_frame_alloc();
+    AVFrame *frame = av_frame_alloc();//创建一个新的AVFrame
     double pts;
     double duration;
     int ret;
@@ -2232,9 +2235,9 @@ static int ffplay_video_thread(void *arg)
 #endif
         return AVERROR(ENOMEM);
     }
-
+    //开启无限循环，无限地去从packet_queue中拿取pkt来解码。
     for (;;) {
-        ret = get_video_frame(ffp, frame);
+        ret = get_video_frame(ffp, frame);//解码，并将解码后的帧数据存放在frame中
         if (ret < 0)
             goto the_end;
         if (!ret)
@@ -2339,6 +2342,7 @@ static int ffplay_video_thread(void *arg)
 #endif
             duration = (frame_rate.num && frame_rate.den ? av_q2d((AVRational){frame_rate.den, frame_rate.num}) : 0);
             pts = (frame->pts == AV_NOPTS_VALUE) ? NAN : frame->pts * av_q2d(tb);
+            //将frame入队到pictq中，来让渲染线程读取。
             ret = queue_picture(ffp, frame, pts, duration, frame->pkt_pos, is->viddec.pkt_serial);
             av_frame_unref(frame);
 #if CONFIG_AVFILTER
@@ -3777,7 +3781,7 @@ static VideoState *stream_open(FFPlayer *ffp, const char *filename, AVInputForma
     ffp->is = is;
     //如果start_on_prepared=false，那么当prepare完之后要暂停，不能直接播放。
     is->pause_req = !ffp->start_on_prepared;
-    //创建视频刷新线程
+    //创建视频渲染线程
     is->video_refresh_tid = SDL_CreateThreadEx(&is->_video_refresh_tid, video_refresh_thread, ffp, "ff_vout");
     if (!is->video_refresh_tid) {
         av_freep(&ffp->is);

@@ -50,7 +50,7 @@ IJKFF_Pipenode *ffpipenode_create_video_decoder_from_ffplay(FFPlayer *ffp)
 
     IJKFF_Pipenode_Opaque *opaque = node->opaque;
     opaque->ffp         = ffp;
-
+    //为node的函数赋值
     node->func_destroy  = func_destroy;
     node->func_run_sync = func_run_sync;
 

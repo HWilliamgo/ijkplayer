@@ -59,7 +59,7 @@ static void func_destroy(IJKFF_Pipeline *pipeline)
         ALOGE("amediacodec-pipeline:destroy: SetupThreadEnv failed\n");
         goto fail;
     }
-
+    //变量并释放IJKFF_Pipeline_Opaque.jsurface
     SDL_JNI_DeleteGlobalRefP(env, &opaque->jsurface);
 fail:
     return;
