@@ -7,4 +7,5 @@ include ':ijkplayer-java'
 include ':ijkplayer-exo'
 
 include ':ijkplayer-example'
+include ':ijkplayer-full'
 
