@@ -49,8 +49,10 @@ import java.lang.ref.WeakReference;
 import java.lang.reflect.Field;
 import java.security.InvalidParameterException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 import tv.danmaku.ijk.media.player.annotations.AccessedByNative;
 import tv.danmaku.ijk.media.player.annotations.CalledByNative;
@@ -67,18 +69,6 @@ import tv.danmaku.ijk.media.player.pragma.DebugLog;
  */
 public final class IjkMediaPlayer extends AbstractMediaPlayer {
     private final static String TAG = IjkMediaPlayer.class.getName();
-
-    private static final int MEDIA_NOP = 0; // interface test message
-    private static final int MEDIA_PREPARED = 1;
-    private static final int MEDIA_PLAYBACK_COMPLETE = 2;
-    private static final int MEDIA_BUFFERING_UPDATE = 3;
-    private static final int MEDIA_SEEK_COMPLETE = 4;
-    private static final int MEDIA_SET_VIDEO_SIZE = 5;
-    private static final int MEDIA_TIMED_TEXT = 99;
-    private static final int MEDIA_ERROR = 100;
-    private static final int MEDIA_INFO = 200;
-
-    protected static final int MEDIA_SET_VIDEO_SAR = 10001;
 
     //----------------------------------------
     // options
@@ -102,6 +92,34 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     public static final int SDL_FCC_RV16 = 0x36315652; // RGB565
     public static final int SDL_FCC_RV32 = 0x32335652; // RGBX8888
     //----------------------------------------
+
+
+    // IjkMediaPlayer Post Message
+    public static final int IJK_MSG_NOP = 0;
+    public static final int IJK_MSG_ERROR = 100;
+    public static final int IJK_MSG_PREPARED = 200;
+    public static final int IJK_MSG_COMPLETED = 300;
+    public static final int IJK_MSG_VIDEO_SIZE_CHANGED = 400;
+    public static final int IJK_MSG_SAR_CHANGED = 401;
+    public static final int IJK_MSG_VIDEO_RENDERING_START = 402;
+    public static final int IJK_MSG_AUDIO_RENDERING_START = 403;
+    public static final int IJK_MSG_VIDEO_ROTATION_CHANGED = 404;
+    public static final int IJK_MSG_AUDIO_DECODED_START = 405;
+    public static final int IJK_MSG_VIDEO_DECODED_START = 406;
+    public static final int IJK_MSG_OPEN_INPUT = 407;
+    public static final int IJK_MSG_FIND_STREAM_INFO = 408;
+    public static final int IJK_MSG_COMPONENT_OPEN = 409;
+    public static final int IJK_MSG_VIDEO_SEEK_RENDERING_START = 410;
+    public static final int IJK_MSG_AUDIO_SEEK_RENDERING_START = 411;
+
+    public static final int IJK_MSG_BUFFERING_START = 500;
+    public static final int IJK_MSG_BUFFERING_END = 501;
+    public static final int IJK_MSG_BUFFERING_UPDATE = 502;
+    public static final int IJK_MSG_CURRENT_POSITION_UPDATE = 510;
+    public static final int IJK_MSG_SEEK_COMPLETE = 600;
+    public static final int IJK_MSG_TIMED_TEXT = 800;
+    public static final int IJK_MSG_ACCURATE_SEEK_COMPLETE = 900;
+
 
     //----------------------------------------
     // properties
@@ -427,9 +445,9 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
                 if (!TextUtils.isEmpty(value))
                     sb.append(entry.getValue());
                 sb.append("\r\n");
-                setOption(OPT_CATEGORY_FORMAT, "headers", sb.toString());
-                setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "protocol_whitelist", "async,cache,crypto,file,http,https,ijkhttphook,ijkinject,ijklivehook,ijklongurl,ijksegment,ijktcphook,pipe,rtp,tcp,tls,udp,ijkurlhook,data");
             }
+            setOption(OPT_CATEGORY_FORMAT, "headers", sb.toString());
+            setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "protocol_whitelist", "async,cache,crypto,file,http,https,ijkhttphook,ijkinject,ijklivehook,ijklongurl,ijksegment,ijktcphook,pipe,rtp,tcp,tls,udp,ijkurlhook,data");
         }
         setDataSource(path);
     }
@@ -731,6 +749,16 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
         _setLoopCount(loopCount);
     }
 
+    /**
+     * Sets the player's loop count
+     * @param loopCount 1 for noo-loop, 0 for infinity loop, or other positive loop count
+     *
+     */
+    public void setLoopCount(int loopCount) {
+        setOption(OPT_CATEGORY_PLAYER, "loop", loopCount);
+        _setLoopCount(loopCount);
+    }
+
     private native void _setLoopCount(int loopCount);
 
     /**
@@ -742,6 +770,14 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     public boolean isLooping() {
         int loopCount = _getLoopCount();
         return loopCount != 1;
+    }
+
+    /**
+     * Get player's remaining loop count
+     * @return the player's remaining loop count
+     */
+    public int getLoopCount() {
+        return _getLoopCount();
     }
 
     private native int _getLoopCount();
@@ -975,17 +1011,21 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
                 return;
             }
 
-            switch (msg.what) {
-            case MEDIA_PREPARED:
-                player.notifyOnPrepared();
-                return;
+            // DebugLog.dfmt("onEvent", "what %d arg1 %d arg2 %d", msg.what, msg.arg1, msg.arg2);
+            for (IjkEventListener listener : player.mEventListeners) {
+                listener.onEvent(player, msg.what, msg.arg1, msg.arg2, msg.obj);
+            }
 
-            case MEDIA_PLAYBACK_COMPLETE:
+            switch (msg.what) {
+            case IJK_MSG_PREPARED:
+                player.notifyOnPrepared();
+                break;
+            case IJK_MSG_COMPLETED:
                 player.stayAwake(false);
                 player.notifyOnCompletion();
-                return;
+                break;
 
-            case MEDIA_BUFFERING_UPDATE:
+            case IJK_MSG_BUFFERING_UPDATE:
                 long bufferPosition = msg.arg1;
                 if (bufferPosition < 0) {
                     bufferPosition = 0;
@@ -1002,56 +1042,87 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
 
                 // DebugLog.efmt(TAG, "Buffer (%d%%) %d/%d",  percent, bufferPosition, duration);
                 player.notifyOnBufferingUpdate((int)percent);
-                return;
+                break;
 
-            case MEDIA_SEEK_COMPLETE:
+            case IJK_MSG_SEEK_COMPLETE:
                 player.notifyOnSeekComplete();
-                return;
+                break;
 
-            case MEDIA_SET_VIDEO_SIZE:
+            case IJK_MSG_VIDEO_SIZE_CHANGED:
                 player.mVideoWidth = msg.arg1;
                 player.mVideoHeight = msg.arg2;
                 player.notifyOnVideoSizeChanged(player.mVideoWidth, player.mVideoHeight,
                         player.mVideoSarNum, player.mVideoSarDen);
-                return;
-
-            case MEDIA_ERROR:
-                DebugLog.e(TAG, "Error (" + msg.arg1 + "," + msg.arg2 + ")");
-                if (!player.notifyOnError(msg.arg1, msg.arg2)) {
-                    player.notifyOnCompletion();
-                }
-                player.stayAwake(false);
-                return;
-
-            case MEDIA_INFO:
-                switch (msg.arg1) {
-                    case MEDIA_INFO_VIDEO_RENDERING_START:
-                        DebugLog.i(TAG, "Info: MEDIA_INFO_VIDEO_RENDERING_START\n");
-                        break;
-                }
-                player.notifyOnInfo(msg.arg1, msg.arg2);
-                // No real default action so far.
-                return;
-            case MEDIA_TIMED_TEXT:
-                if (msg.obj == null) {
-                    player.notifyOnTimedText(null);
-                } else {
-                    IjkTimedText text = new IjkTimedText(new Rect(0, 0, 1, 1), (String)msg.obj);
-                    player.notifyOnTimedText(text);
-                }
-                return;
-            case MEDIA_NOP: // interface test message - ignore
                 break;
 
-            case MEDIA_SET_VIDEO_SAR:
+            case IJK_MSG_SAR_CHANGED:
                 player.mVideoSarNum = msg.arg1;
                 player.mVideoSarDen = msg.arg2;
                 player.notifyOnVideoSizeChanged(player.mVideoWidth, player.mVideoHeight,
                         player.mVideoSarNum, player.mVideoSarDen);
                 break;
 
+            case IJK_MSG_ERROR:
+                DebugLog.e(TAG, "Error (" + msg.arg1 + "," + msg.arg2 + "," + msg.obj + ")");
+                if (!player.notifyOnError(msg.arg1, msg.arg2)) {
+                    player.notifyOnCompletion();
+                }
+                player.stayAwake(false);
+                break;
+
+            case IJK_MSG_VIDEO_RENDERING_START:
+                player.notifyOnInfo(MEDIA_INFO_VIDEO_RENDERING_START, 0);
+                DebugLog.i(TAG, "Info: MEDIA_INFO_VIDEO_RENDERING_START\n");
+                break;
+            case IJK_MSG_AUDIO_RENDERING_START:
+                player.notifyOnInfo(MEDIA_INFO_AUDIO_RENDERING_START, 0);
+                break;
+            case IJK_MSG_VIDEO_ROTATION_CHANGED:
+                player.notifyOnInfo(MEDIA_INFO_VIDEO_ROTATION_CHANGED, 0);
+                break;
+            case IJK_MSG_AUDIO_DECODED_START:
+                player.notifyOnInfo(MEDIA_INFO_AUDIO_DECODED_START, 0);
+                break;
+            case IJK_MSG_VIDEO_DECODED_START:
+                player.notifyOnInfo(MEDIA_INFO_VIDEO_DECODED_START, 0);
+                break;
+            case IJK_MSG_OPEN_INPUT:
+                player.notifyOnInfo(MEDIA_INFO_OPEN_INPUT, 0);
+                break;
+            case IJK_MSG_FIND_STREAM_INFO:
+                player.notifyOnInfo(MEDIA_INFO_FIND_STREAM_INFO, 0);
+                break;
+            case IJK_MSG_COMPONENT_OPEN:
+                player.notifyOnInfo(MEDIA_INFO_COMPONENT_OPEN, 0);
+                break;
+            case IJK_MSG_BUFFERING_START:
+                player.notifyOnInfo(MEDIA_INFO_BUFFERING_START, msg.arg1);
+                break;
+            case IJK_MSG_BUFFERING_END:
+                player.notifyOnInfo(MEDIA_INFO_BUFFERING_END, msg.arg1);
+                break;
+            case IJK_MSG_VIDEO_SEEK_RENDERING_START:
+                player.notifyOnInfo(MEDIA_INFO_VIDEO_SEEK_RENDERING_START, msg.arg1);
+                break;
+            case IJK_MSG_AUDIO_SEEK_RENDERING_START:
+                player.notifyOnInfo(MEDIA_INFO_AUDIO_SEEK_RENDERING_START, msg.arg1);
+                break;
+            case IJK_MSG_ACCURATE_SEEK_COMPLETE:
+                player.notifyOnInfo(MEDIA_INFO_MEDIA_ACCURATE_SEEK_COMPLETE, msg.arg1);
+                break;
+            case IJK_MSG_TIMED_TEXT:
+                if (msg.obj == null) {
+                    player.notifyOnTimedText(null);
+                } else {
+                    IjkTimedText text = new IjkTimedText(new Rect(0, 0, 1, 1), (String)msg.obj);
+                    player.notifyOnTimedText(text);
+                }
+                break;
+            case IJK_MSG_NOP: // interface test message - ignore
+                break;
+
             default:
-                DebugLog.e(TAG, "Unknown message type " + msg.what);
+                // DebugLog.e(TAG, "Unknown message type " + msg.what);
             }
         }
     }
@@ -1075,11 +1146,12 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
             return;
         }
 
-        if (what == MEDIA_INFO && arg1 == MEDIA_INFO_STARTED_AS_NEXT) {
-            // this acquires the wakelock if needed, and sets the client side
-            // state
-            mp.start();
-        }
+        // native ijkplayer never post this message
+        // if (what == MEDIA_INFO && arg1 == MEDIA_INFO_STARTED_AS_NEXT) {
+        //     // this acquires the wakelock if needed, and sets the client side
+        //     // state
+        //     mp.start();
+        // }
         if (mp.mEventHandler != null) {
             Message m = mp.mEventHandler.obtainMessage(what, arg1, arg2, obj);
             mp.mEventHandler.sendMessage(m);
@@ -1191,6 +1263,15 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     private OnMediaCodecSelectListener mOnMediaCodecSelectListener;
     public void setOnMediaCodecSelectListener(OnMediaCodecSelectListener listener) {
         mOnMediaCodecSelectListener = listener;
+    }
+
+    private Set<IjkEventListener> mEventListeners = new HashSet<>();
+    public final void addIjkEventListener(IjkEventListener listener){
+        mEventListeners.add(listener);
+    }
+
+    public final void removeIjkEventListener(IjkEventListener listener){
+        mEventListeners.remove(listener);
     }
 
     public void resetListeners() {

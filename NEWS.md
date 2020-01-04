@@ -1,5 +1,73 @@
 tag next
 --------------------------------
+tag f0.4.4
+--------------------------------
+- desktop: add libyuv for YUV2RGB
+- ijkplayer: iOS videotoolbox notify rotate msg
+- fix: call start after preparAsync may cause pause state
+
+tag f0.4.3
+--------------------------------
+- desktop: fix invalid audio channel number for portaudio
+- ijkplayer: add current position msg option
+- ijkplayer: notify buffering update 100 percent
+
+tag f0.4.0
+--------------------------------
+- ijkplayer: add osx desktop support, use portaudio for audio output
+
+tag f0.3.8
+--------------------------------
+- ijkplayer: ios vout add render to pixelbuffer, off screen buffer
+- android: add FileMediaDataSource StreamDataSource
+
+tag f0.3.7
+--------------------------------
+- ffmpeg: enable concat and crypto protocol
+
+tag f0.3.6
+--------------------------------
+- ijkplayer: add ffp_reset, call ffp_reset in ijkmp_reset
+
+tag f0.3.5
+--------------------------------
+- fijkplayer: change to state error when notify error
+- fijkplayer: add error msg when notify error
+- android: add set/get loopCount api
+
+tag f0.3.4
+--------------------------------
+- ffmpeg: add rtsp support
+- ios: remove armv7s
+
+tag f0.3.3
+--------------------------------
+- ijkplayer: msg_queue_abort move to shutdown
+- ijkplayer: update ijkmp_reset, just wait_stop_l, no release
+- ios: IJKFFMediaPlayer copy overlay memory pixel to CVPixelBuffer
+
+tag f0.3.2
+--------------------------------
+- android: add javadoc and source to bintray
+- expose all player event to fijkplayer
+
+tag f0.3.1
+--------------------------------
+- ios: IJKFFMediaPlayer add volume and position api
+- android: update Mesage id
+- ijkplayer: make sure change to state started
+
+tag f0.3.0
+--------------------------------
+- change prefix for fijkplayer release tag names `f`
+- ios: build static lib FIJKPlayer.framework
+- ios: fix FIJKPlayer.podspec error
+
+tag b0.2.0
+--------------------------------
+- ios: add support for flutter texture
+- ios: fix some vtb errors #873
+- ijkplayer: new release bintary and CocoaPods
 
 tag k0.8.8
 --------------------------------

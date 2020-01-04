@@ -63,6 +63,9 @@
 #define SDL_FCC_RV24    SDL_FOURCC('R', 'V', '2', '4')    /**< bpp=24, RGB888 */
 #define SDL_FCC_RV32    SDL_FOURCC('R', 'V', '3', '2')    /**< bpp=32, RGBX8888 */
 
+#define SDL_FCC_BGRA    SDL_FOURCC('B', 'G', 'R', 'A')    /**> bpp=32, BGRA8888 */
+#define SDL_FCC_RGBA    SDL_FOURCC('R', 'G', 'B', 'A')    /**> bpp=32, RGBA8888 */
+
 // opaque formats
 #define SDL_FCC__AMC    SDL_FOURCC('_', 'A', 'M', 'C')    /**< Android MediaCodec */
 #define SDL_FCC__VTB    SDL_FOURCC('_', 'V', 'T', 'B')    /**< iOS VideoToolbox */
