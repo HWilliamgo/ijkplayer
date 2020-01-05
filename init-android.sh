@@ -48,3 +48,7 @@ pull_fork "x86_64"
 ./init-config.sh
 ./init-android-libyuv.sh
 ./init-android-soundtouch.sh
+
+#将ijkyuv和ijksoundtouch模块的CMakeList.txt拷贝到对应模块下。(因为这两个模块在.gitignore中，无法被git记录，所以拷贝)
+cp extra/CMakeLists.txt.yuv ijkmedia/ijkyuv/CMakeLists.txt
+cp extra/CMakeLists.txt.soundtouch ijkmedia/ijksoundtouch/CMakeLists.txt
