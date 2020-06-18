@@ -1058,6 +1058,7 @@ public class IjkVideoView extends FrameLayout implements MediaController.MediaPl
                     } else {
                         ijkMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "opensles", 0);
                     }
+                    ijkMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "soundtouch", 1);
 
                     String pixelFormat = mSettings.getPixelFormat();
                     if (TextUtils.isEmpty(pixelFormat)) {
@@ -1257,5 +1258,15 @@ public class IjkVideoView extends FrameLayout implements MediaController.MediaPl
 
     public int getSelectedTrack(int trackType) {
         return MediaPlayerCompat.getSelectedTrack(mMediaPlayer, trackType);
+    }
+
+    public void setSpeed(float speed){
+        if (mMediaPlayer!=null){
+            if (mMediaPlayer instanceof IjkMediaPlayer){
+                IjkMediaPlayer ijkMediaPlayer= (IjkMediaPlayer) mMediaPlayer;
+                ijkMediaPlayer.setSpeed(speed);
+                Log.d(TAG,"setSpeed"+speed);
+            }
+        }
     }
 }

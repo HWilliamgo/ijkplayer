@@ -288,7 +288,7 @@ static int reconfigure_codec_l(JNIEnv *env, IJKFF_Pipenode *node, jobject new_su
     }
 
     SDL_JNI_DeleteGlobalRefP(env, &prev_jsurface);
-
+    //acodec = new MediaCodec。通过jni调用了android的MediaCodec的构造函数createByCodecName
     if (!opaque->acodec) {
         opaque->acodec = create_codec_l(env, node);
         if (!opaque->acodec) {
@@ -320,14 +320,14 @@ static int reconfigure_codec_l(JNIEnv *env, IJKFF_Pipenode *node, jobject new_su
 
         assert(opaque->weak_vout);
     }
-
+    //MediaCodec.setSurface
     amc_ret = SDL_AMediaCodec_configure_surface(env, opaque->acodec, opaque->input_aformat, opaque->jsurface, NULL, 0);
     if (amc_ret != SDL_AMEDIA_OK) {
         ALOGE("%s:configure_surface: failed\n", __func__);
         ret = -1;
         goto fail;
     }
-
+    //MediaCodec.start
     amc_ret = SDL_AMediaCodec_start(opaque->acodec);
     if (amc_ret != SDL_AMEDIA_OK) {
         ALOGE("%s:SDL_AMediaCodec_start: failed\n", __func__);
@@ -1588,17 +1588,18 @@ static int func_run_sync(IJKFF_Pipenode *node)
     frame = av_frame_alloc();
     if (!frame)
         goto fail;
-
+    //A. 创建enqueue_thread，喂原始数据
     opaque->enqueue_thread = SDL_CreateThreadEx(&opaque->_enqueue_thread, enqueue_thread_func, node, "amediacodec_input_thread");
     if (!opaque->enqueue_thread) {
         ALOGE("%s: SDL_CreateThreadEx failed\n", __func__);
         ret = -1;
         goto fail;
     }
-
+    //B. 循环拉取解码数据
     while (!q->abort_request) {
         int64_t timeUs = opaque->acodec_first_dequeue_output_request ? 0 : AMC_OUTPUT_TIMEOUT_US;
         got_frame = 0;
+        //1. drain_output_buffer获取frame
         ret = drain_output_buffer(env, node, timeUs, &dequeue_count, frame, &got_frame);
         if (opaque->acodec_first_dequeue_output_request) {
             SDL_LockMutex(opaque->acodec_first_dequeue_output_mutex);
@@ -1607,6 +1608,7 @@ static int func_run_sync(IJKFF_Pipenode *node)
             SDL_UnlockMutex(opaque->acodec_first_dequeue_output_mutex);
         }
         if (ret != 0) {
+            //拉取出错，release buffer false通知MediaCodec丢弃这一帧
             ret = -1;
             if (got_frame && frame->opaque)
                 SDL_VoutAndroid_releaseBufferProxyP(opaque->weak_vout, (SDL_AMediaCodecBufferProxy **)&frame->opaque, false);
@@ -1615,6 +1617,7 @@ static int func_run_sync(IJKFF_Pipenode *node)
         if (got_frame) {
             duration = (frame_rate.num && frame_rate.den ? av_q2d((AVRational){frame_rate.den, frame_rate.num}) : 0);
             pts = (frame->pts == AV_NOPTS_VALUE) ? NAN : frame->pts * av_q2d(tb);
+            //2. 解码速度过慢，丢帧
             if (ffp->framedrop > 0 || (ffp->framedrop && ffp_get_master_sync_type(is) != AV_SYNC_VIDEO_MASTER)) {
                 ffp->stat.decode_frame_count++;
                 if (frame->pts != AV_NOPTS_VALUE) {
@@ -1640,6 +1643,7 @@ static int func_run_sync(IJKFF_Pipenode *node)
                     }
                 }
             }
+            //3. 帧入队
             ret = ffp_queue_picture(ffp, frame, pts, duration, av_frame_get_pkt_pos(frame), is->viddec.pkt_serial);
             if (ret) {
                 if (frame->opaque)
@@ -1919,7 +1923,7 @@ IJKFF_Pipenode *ffpipenode_create_video_decoder_from_android_mediacodec(FFPlayer
     JNIEnv                *env    = NULL;
     int                    ret    = 0;
     jobject                jsurface = NULL;
-
+    //1. 初始化node
     node->func_destroy  = func_destroy;
     if (ffp->mediacodec_sync) {
         node->func_run_sync = func_run_sync_loop;
@@ -1939,7 +1943,7 @@ IJKFF_Pipenode *ffpipenode_create_video_decoder_from_android_mediacodec(FFPlayer
     ret = avcodec_parameters_from_context(opaque->codecpar, opaque->decoder->avctx);
     if (ret)
         goto fail;
-
+    //2. 硬解选项检查
     switch (opaque->codecpar->codec_id) {
     case AV_CODEC_ID_H264:
         if (!ffp->mediacodec_avc && !ffp->mediacodec_all_videos) {
@@ -2047,26 +2051,27 @@ IJKFF_Pipenode *ffpipenode_create_video_decoder_from_android_mediacodec(FFPlayer
         ALOGE("%s:open_video_decoder: SDL_CreateCond() failed\n", __func__);
         goto fail;
     }
-
+    //3. 创建MediaFormat
     ret = recreate_format_l(env, node);
     if (ret) {
         ALOGE("amc: recreate_format_l failed\n");
         goto fail;
     }
-
+    //4. 选择codec(选择最佳codec name)
     if (!ffpipeline_select_mediacodec_l(pipeline, &opaque->mcc) || !opaque->mcc.codec_name[0]) {
         ALOGE("amc: no suitable codec\n");
         goto fail;
     }
 
     jsurface = ffpipeline_get_surface_as_global_ref(env, pipeline);
+    //5. 配置codec(创建MediaCodec)
     ret = reconfigure_codec_l(env, node, jsurface);
     J4A_DeleteGlobalRef__p(env, &jsurface);
     if (ret != 0)
         goto fail;
 
     ffp_set_video_codec_info(ffp, MEDIACODEC_MODULE_NAME, opaque->mcc.codec_name);
-
+    //一些特殊的解码器需要在MediaCodec解码后，增加一级帧队列，队列按pts排序，然后再送出到FrameQueue，源码分析中不考虑该特殊情况。
     opaque->off_buf_out = 0;
     if (opaque->n_buf_out) {
         int i;

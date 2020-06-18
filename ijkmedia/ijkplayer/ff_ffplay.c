@@ -2540,6 +2540,12 @@ reload:
         af->frame->sample_rate   != is->audio_src.freq           ||
         (wanted_nb_samples       != af->frame->nb_samples && !is->swr_ctx)||
         (ffp->soundtouch_enable&&!is->swr_ctx)) {
+        av_log(NULL,AV_LOG_DEBUG,"af->frame->format=%d , is->audio_src.fmt=%d",af->frame->format,is->audio_src.fmt);
+        av_log(NULL,AV_LOG_DEBUG,"dec_channel_layout=%lld , is->audio_src.channel_layout=%lld",dec_channel_layout,is->audio_src.channel_layout);
+        av_log(NULL,AV_LOG_DEBUG,"af->frame->sample_rate=%d , is->audio_src.freq=%d",af->frame->sample_rate,is->audio_src.freq);
+        av_log(NULL,AV_LOG_DEBUG,"wanted_nb_samples=%d , af->frame->nb_samples=%d",wanted_nb_samples,af->frame->nb_samples);
+
+
         AVDictionary *swr_opts = NULL;
         swr_free(&is->swr_ctx);
         is->swr_ctx = swr_alloc_set_opts(NULL,
