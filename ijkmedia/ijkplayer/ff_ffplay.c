@@ -2538,7 +2538,8 @@ reload:
     if (af->frame->format        != is->audio_src.fmt            ||
         dec_channel_layout       != is->audio_src.channel_layout ||
         af->frame->sample_rate   != is->audio_src.freq           ||
-        (wanted_nb_samples       != af->frame->nb_samples && !is->swr_ctx)) {
+        (wanted_nb_samples       != af->frame->nb_samples && !is->swr_ctx)||
+        (ffp->soundtouch_enable&&!is->swr_ctx)) {
         AVDictionary *swr_opts = NULL;
         swr_free(&is->swr_ctx);
         is->swr_ctx = swr_alloc_set_opts(NULL,
