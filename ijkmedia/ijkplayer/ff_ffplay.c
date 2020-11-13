@@ -2614,7 +2614,8 @@ reload:
         int bytes_per_sample = av_get_bytes_per_sample(is->audio_tgt.fmt);
         resampled_data_size = len2 * is->audio_tgt.channels * bytes_per_sample;
 #if defined(__ANDROID__)
-        if (ffp->soundtouch_enable && ffp->pf_playback_rate != 1.0f && !is->abort_request) {
+        if (ffp->soundtouch_enable && ffp->pf_playback_rate != 1.0f &&
+            ffp->pf_playback_rate != 0.0f && !is->abort_request) {
             av_fast_malloc(&is->audio_new_buf, &is->audio_new_buf_size, out_size * translate_time);
             for (int i = 0; i < (resampled_data_size / 2); i++)
             {
@@ -4883,6 +4884,10 @@ void ffp_set_playback_rate(FFPlayer *ffp, float rate)
         return;
 
     av_log(ffp, AV_LOG_INFO, "Playback rate: %f\n", rate);
+    if (rate == 0) {
+        av_log(ffp, AV_LOG_WARNING, "Playback rate must not be 0, so we skip 0 rate.");
+        return;
+    }
     ffp->pf_playback_rate = rate;
     ffp->pf_playback_rate_changed = 1;
 }
